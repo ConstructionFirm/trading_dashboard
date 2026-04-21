@@ -65,6 +65,8 @@
   --shadow-sm: 0 2px 8px rgba(0,0,0,0.06);
 }
 
+.hidden { display: none !important; }
+
 /* ─── RESET & BASE ─── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 

@@ -1,3 +1,20 @@
+console.log("🚀 StockPulse AI: app.js loaded successfully");
+
+// ─── Global Error Logger ───
+window.onerror = function(msg, url, line, col, error) {
+  const logMsg = `[ERROR] ${msg} at ${url}:${line}:${col}`;
+  console.error(logMsg, error);
+  const debugEl = document.getElementById('debug-last-error');
+  if (debugEl) debugEl.textContent = logMsg;
+  return false;
+};
+
+window.onunhandledrejection = function(event) {
+  console.error('[PROMISE REJECTION]', event.reason);
+  const debugEl = document.getElementById('debug-last-error');
+  if (debugEl) debugEl.textContent = `[PROMISE] ${event.reason}`;
+};
+
 // ─── Debug Toggle Button ───
 document.addEventListener('DOMContentLoaded', () => {
   const debugBtn = document.createElement('button');
@@ -12,6 +29,19 @@ document.addEventListener('DOMContentLoaded', () => {
   rawDiv.id = 'raw-fundamentals';
   rawDiv.style = 'position:absolute;top:50px;right:10px;z-index:1000;max-width:400px;';
   document.body.appendChild(rawDiv);
+
+  // Step 9: Diagnostic Debug Overlay
+  const debugOverlay = document.createElement('div');
+  debugOverlay.id = 'diagnostic-debug';
+  debugOverlay.style = 'position:fixed;bottom:10px;right:10px;z-index:9999;padding:12px;background:rgba(0,0,0,0.85);color:#0f0;font-family:monospace;font-size:10px;border:1px solid #0f0;border-radius:8px;pointer-events:none;';
+  debugOverlay.innerHTML = `
+    <div style="font-weight:700;margin-bottom:4px;border-bottom:1px solid #0f0">🔍 AGENT DIAGNOSTICS</div>
+    <div>Ticker: <span id="debug-ticker">None</span></div>
+    <div>Loading: <span id="debug-loading">false</span></div>
+    <div>App State: <span id="debug-state">IDLE</span></div>
+    <div style="margin-top:4px;color:#f00;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px;">Err: <span id="debug-last-error">None</span></div>
+  `;
+  document.body.appendChild(debugOverlay);
 });
 /* ═══════════════════════════════════════════════
    app.js — Main Application Orchestrator
@@ -48,6 +78,7 @@ async function loadStockUniverse() {
 // INIT
 // ────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
+  console.log("DEBUG: DOMContentLoaded fired");
   initTheme();
   initStrategyToggle();
   initSearch();
@@ -137,7 +168,12 @@ function initSearch() {
   });
 
   // Analyze button
-  btn.addEventListener('click', () => { suggestions.classList.add('hidden'); analyzeStock(); });
+  console.log("DEBUG: Binding click event to #analyze-btn");
+  btn.addEventListener('click', () => { 
+    console.log("DEBUG: Analyze button clicked");
+    suggestions.classList.add('hidden'); 
+    analyzeStock(); 
+  });
 
   // Close suggestions on outside click
   document.addEventListener('click', e => {
@@ -195,25 +231,35 @@ function switchTab(tabName) {
 // MAIN ANALYSIS FLOW
 // ────────────────────────────────────────────────
 async function analyzeStock() {
+  console.log("DEBUG: analyzeStock entry");
   const ticker = document.getElementById('ticker-input').value.trim();
-  if (!ticker) { shakeInput(); return; }
-  await loadStockUniverse();
-  if (!STOCK_UNIVERSE.includes(ticker + '.NS') && !STOCK_UNIVERSE.includes(ticker + '.BSE')) {
-    showError('Ticker not found in Indian stock universe.');
-    return;
+  console.log("DEBUG: Ticker read:", ticker);
+  document.getElementById('debug-ticker').textContent = ticker || 'None';
+  document.getElementById('debug-state').textContent = 'INITIALIZING';
+  
+  if (!ticker) { 
+    console.log("DEBUG: Empty ticker, shaking input");
+    shakeInput(); 
+    return; 
   }
 
+  // ─── IMMEDIATE FEEDBACK ───
+  console.log("DEBUG: Ticker found. Showing loading immediately.");
   showLoading(true);
+  document.getElementById('debug-loading').textContent = 'true';
+  document.getElementById('debug-state').textContent = 'LOADING_UNIVERSE';
+  setLoadingStatus('Initializing analysis engine...');
   clearRefreshTimer();
 
   try {
-    // Update loading steps
+    // Reset steps
     stepDone('step-price', false);
     stepDone('step-fundamentals', false);
     stepDone('step-indicators', false);
     stepDone('step-news', false);
 
     const onStep = (msg, status) => {
+      console.log(`DEBUG: Analysis Step: ${msg} (${status || 'progress'})`);
       setLoadingStatus(msg);
       if (status === 'done') {
         if (msg.includes('price') || msg.includes('chart')) stepDone('step-price');
@@ -223,23 +269,55 @@ async function analyzeStock() {
       }
     };
 
+    // Load universe with error handling
+    console.log("DEBUG: Loading stock universe...");
+    setLoadingStatus('Verifying ticker in Indian universe...');
+    try {
+      await loadStockUniverse();
+    } catch (uErr) {
+      console.warn("DEBUG: Stock universe fetch failed, using fallback:", uErr.message);
+      // Fallback is handled within loadStockUniverse if it was properly written, 
+      // but let's ensure we proceed if it fails.
+    }
+    
+    const symbolNS = ticker + '.NS';
+    const symbolBSE = ticker + '.BSE';
+    const exists = STOCK_UNIVERSE && (STOCK_UNIVERSE.includes(symbolNS) || STOCK_UNIVERSE.includes(symbolBSE));
+
+    if (!exists) {
+      console.warn("DEBUG: Ticker not found in universe list:", ticker);
+      setLoadingStatus(`Ticker ${ticker} not in central list, trying direct fetch...`);
+    }
+
+    console.log("DEBUG: Calling loadAllData...");
+    document.getElementById('debug-state').textContent = 'FETCHING_DATA';
     const data = await loadAllData(ticker, onStep);
+    
+    console.log("DEBUG: loadAllData returned successful data for:", data.symbol);
+    document.getElementById('debug-state').textContent = 'DATA_READY';
+    
     AppState.data = data;
     AppState.symbol = data.symbol;
 
     // All steps done
     ['step-price', 'step-fundamentals', 'step-indicators', 'step-news'].forEach(stepDone);
 
+    console.log("DEBUG: Hiding loading and showing dashboard");
     showLoading(false);
+    document.getElementById('debug-loading').textContent = 'false';
+    document.getElementById('debug-state').textContent = 'COMPLETE';
     showDashboard();
     renderAll(data);
     startRefreshTimer(ticker);
-    console.log('STATE:', data);
+    console.log('DEBUG: Analysis Finished:', data);
 
   } catch (err) {
+    console.error("DEBUG: Analysis Flow FAILED:", err);
     showLoading(false);
+    document.getElementById('debug-loading').textContent = 'false';
+    document.getElementById('debug-state').textContent = 'ERROR';
+    document.getElementById('debug-last-error').textContent = err.message;
     showError(err.message);
-    console.error('Analysis failed:', err);
   }
 }
 
