@@ -2,6 +2,20 @@
 const STOCK_LIST_CACHE_KEY = 'stock_universe_v1';
 const STOCK_LIST_CACHE_TTL = 24 * 60 * 60 * 1000; // 1 day
 
+// ─── Search API (NSE Ruby) ───
+async function searchNSE(query) {
+  try {
+    const url = `${API_CONFIG.NSE_RUBY_BASE}/search?q=${encodeURIComponent(query)}`;
+    const res = await fetch(url);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data && data.results ? data.results : [];
+  } catch (e) {
+    console.warn('NSE Search fail:', e.message);
+    return [];
+  }
+}
+
 // Fetch NSE equity list (preferred)
 async function fetchNSEStockUniverse() {
   try {
@@ -73,7 +87,7 @@ async function getStockUniverse() {
     let stocks = [];
     console.log("DEBUG: Fetching NSE universe...");
     const nseData = await fetchNSEStockUniverse(); // fetchWithProxy already has timeout
-    
+
     if (nseData) {
       stocks = parseNSEStockUniverse(nseData);
       console.log("DEBUG: NSE API universe success");
@@ -139,8 +153,9 @@ async function batchFetchStocks(tickers, fetchFn, batchSize = 10, delayMs = 1500
 }
 // ─── Alpha Vantage API Key (replace with your free key) ───
 const API_CONFIG = {
+  NSE_RUBY_BASE: 'https://nse-api-ruby.vercel.app',
   FMP_KEY: 'MSYnvjjcS8HU7D93Fz7dUn9YXslByfXH',
-  FMP_BASE: 'https://financialmodelingprep.com/stable', 
+  FMP_BASE: 'https://financialmodelingprep.com/stable',
   YF_BASES: [
     'https://query1.finance.yahoo.com',
     'https://query2.finance.yahoo.com'
@@ -162,11 +177,11 @@ async function fetchFMP(endpoint, params = {}) {
   try {
     const res = await fetch(url);
     const text = await res.text();
-    
+
     if (text.includes("Premium Query Parameter") || text.includes("not available under your current subscription")) {
       throw new Error('FMP_PREMIUM_REQUIRED');
     }
-    
+
     if (!res.ok) throw new Error(`FMP HTTP ${res.status}`);
     return JSON.parse(text);
   } catch (e) {
@@ -218,7 +233,7 @@ function generateSimulatedChartData(symbol) {
   for (let i = 0; i < days; i++) {
     const date = new Date(now);
     date.setDate(now.getDate() - (days - i));
-    
+
     const open = price;
     const change = price * volatility * (Math.random() - 0.5);
     const close = price + change;
@@ -259,13 +274,13 @@ async function fetchChartData(symbol) {
       volume: d.volume,
     }));
 
-    return { 
-      ohlcv, 
-      meta: { 
-        symbol: data.symbol, 
-        regularMarketPrice: ohlcv[ohlcv.length-1].close,
-        regularMarketPreviousClose: ohlcv[ohlcv.length-2].close
-      } 
+    return {
+      ohlcv,
+      meta: {
+        symbol: data.symbol,
+        regularMarketPrice: ohlcv[ohlcv.length - 1].close,
+        regularMarketPreviousClose: ohlcv[ohlcv.length - 2].close
+      }
     };
   } catch (e) {
     console.warn('FMP Fail:', e.message);
@@ -275,7 +290,7 @@ async function fetchChartData(symbol) {
   try {
     console.log(`DEBUG: Stage 2 - Community Fallback: ${symbol}`);
     window._activeSource = 'Community (Proxy Rotated)';
-    
+
     let result = null;
     for (const base of API_CONFIG.YF_BASES) {
       try {
@@ -285,7 +300,7 @@ async function fetchChartData(symbol) {
         if (result) break;
       } catch (err) { continue; }
     }
-    
+
     if (!result) throw new Error('YAHOO_ALL_FAILED');
 
     const ts = result.timestamp || [];
@@ -309,7 +324,28 @@ async function fetchChartData(symbol) {
 
 // ─── Fetch quote summary (Triple-Layer Resilience) ───
 async function fetchQuoteSummary(symbol) {
+  // Stage 0: Direct NSE API (For Indian Stocks)
+  if (symbol.endsWith('.NS') || symbol.endsWith('.BO')) {
+    try {
+      console.log(`DEBUG: Stage 0 - NSE Ruby Summary: ${symbol}`);
+      const url = `${API_CONFIG.NSE_RUBY_BASE}/stock?symbol=${symbol}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data && data.status === 'success' && data.data) {
+         return {
+           nse_ruby: data.data,
+           symbol,
+           _source: 'Direct NSE API'
+         };
+      }
+    } catch(e) {
+      console.warn('NSE Ruby Summary Fail:', e.message);
+    }
+  }
+
+  // Stage 1: FMP Modern (For US & Fallback)
   try {
+    console.log(`DEBUG: Stage 1 - FMP Summary: ${symbol}`);
     const [quote, profile, ratios, growth] = await Promise.all([
       fetchFMP(`quote`, { symbol: symbol }),
       fetchFMP(`profile`, { symbol: symbol }),
@@ -320,16 +356,39 @@ async function fetchQuoteSummary(symbol) {
     if (!quote || quote.length === 0) throw new Error('EMPTY_FMP');
     return {
       price: quote[0], profile: profile[0] || {},
-      ratios: ratios[0] || {}, growth: growth[0] || {}, symbol
+      ratios: ratios[0] || {}, growth: growth[0] || {}, symbol,
+      _source: 'FMP'
     };
   } catch (e) {
-    console.warn('FMP Summary Fail, using simulation placeholders');
-    return {
-      price: { symbol, price: 0, change: 0, changesPercentage: 0 },
-      profile: { companyName: symbol.replace('.NS','') },
-      ratios: {}, growth: {}, symbol
-    };
+    console.warn('FMP Summary Fail:', e.message);
   }
+
+  // Stage 2: Yahoo Finance + Proxy Rotation
+  try {
+    console.log(`DEBUG: Stage 2 - Community Summary Fallback: ${symbol}`);
+    const modules = 'defaultKeyStatistics,financialData,summaryDetail,summaryProfile,price';
+    const url = `${API_CONFIG.YF_BASES[0]}/v10/finance/quoteSummary/${symbol}?modules=${modules}`;
+
+    const data = await fetchWithProxy(url);
+    const result = data?.quoteSummary?.result?.[0];
+    if (!result) throw new Error('YAHOO_SUMMARY_FAILED');
+
+    return {
+      yahoo: result, // Full Yahoo structure
+      symbol,
+      _source: 'Community'
+    };
+  } catch (e) {
+    console.error('Yahoo Summary Fallback Fail:', e.message);
+  }
+
+  // Stage 3: Autonomous Simulation Placeholders
+  return {
+    price: { symbol, price: 0, change: 0, changesPercentage: 0 },
+    profile: { companyName: symbol.replace('.NS', '') },
+    ratios: {}, growth: {}, symbol,
+    _source: 'Simulated'
+  };
 }
 
 // ─── Fetch Nifty 50 data from FMP ───
@@ -428,16 +487,19 @@ async function loadAllData(ticker, onStep) {
   let fundamentals = null;
   let summary = null;
   try {
-    console.log("DEBUG: Fetching fundamentals for:", symbol);
+    console.log("DEBUG: Fetching Stage 1/2/3 summary for:", symbol);
     summary = await fetchQuoteSummary(symbol);
+    if (summary._source) window._activeSource = summary._source; // Record source
+
     fundamentals = extractFundamentals(summary);
     console.log("DEBUG: Fundamentals extracted successfully");
     step('Fundamentals loaded ✓', 'done');
   } catch (e) {
-    console.warn('DEBUG: Yahoo fundamentals failed, trying fallback:', e.message);
-    fundamentals = await fetchFundamentalsWithFallback(symbol);
-    console.log("DEBUG: Fallback fundamentals success:", !!fundamentals);
-    step('Fundamentals loaded (fallback) ✓', 'done');
+    console.warn('DEBUG: All fundamental stages failed:', e.message);
+    // Ultimate fallback if fetchQuoteSummary failed to return standard result
+    summary = { _source: 'Simulated', symbol };
+    fundamentals = extractFundamentals(summary);
+    step('Fundamentals (Default) ✓', 'done');
   }
 
   // 3. Calculate indicators client-side
@@ -480,10 +542,10 @@ async function loadAllData(ticker, onStep) {
 
   // 5. News & Sentiment
   step('Fetching market news & sentiment...');
-  const companyName = summary?.price?.longName || 
-                      summary?.summaryProfile?.longBusinessSummary?.split(' ')[0] || 
-                      meta?.symbol || 
-                      symbol;
+  const companyName = summary?.price?.longName ||
+    summary?.summaryProfile?.longBusinessSummary?.split(' ')[0] ||
+    meta?.symbol ||
+    symbol;
   console.log("DEBUG: Fetching news for name:", companyName);
   const newsArticles = await fetchNews(companyName, symbol);
   console.log("DEBUG: News fetch success, count:", newsArticles.length);
@@ -543,22 +605,89 @@ async function loadAllData(ticker, onStep) {
   return finalData;
 }
 
-// ─── Extract and normalize fundamentals from FMP ───
+// ─── Extract and normalize fundamentals (Multi-Source) ───
 function extractFundamentals(summary) {
   if (!summary) return {};
 
+  // Case 0: NSE Ruby Data (Direct Indian Data)
+  if (summary.nse_ruby) {
+    const n = summary.nse_ruby;
+    const val = (obj) => obj?.value ?? null;
+    return {
+      marketCap: val(n.market_cap), // Might be in crores, but mapped cleanly
+      pe: val(n.pe_ratio),
+      forwardPE: null,
+      eps: val(n.earnings_per_share),
+      revenueGrowth: null,
+      earningsGrowth: null,
+      roe: null,
+      roa: null,
+      debtToEquity: null,
+      freeCashFlow: null,
+      operatingCashFlow: null,
+      grossMargins: null,
+      operatingMargins: null,
+      profitMargins: null,
+      revenue: null,
+      currentRatio: null,
+      quickRatio: null,
+      priceToBook: null, // API provides book_value, need separate calculation if price to book is needed
+      beta: null,
+      dividendYield: val(n.dividend_yield),
+      promoterHolding: null,
+      institutionalHolding: null,
+      pegRatio: null,
+      bookValue: val(n.book_value),
+    };
+  }
+
+  // Case 1: Yahoo Data (Community Source)
+  if (summary.yahoo) {
+    const y = summary.yahoo;
+    const g = (obj, key) => y?.[obj]?.[key]?.raw ?? null;
+
+    return {
+      marketCap: g('price', 'marketCap') || g('summaryDetail', 'marketCap'),
+      pe: g('summaryDetail', 'trailingPE') || g('defaultKeyStatistics', 'trailingPE'),
+      forwardPE: g('summaryDetail', 'forwardPE'),
+      eps: g('defaultKeyStatistics', 'trailingEps'),
+      revenueGrowth: g('financialData', 'revenueGrowth'),
+      earningsGrowth: g('financialData', 'earningsGrowth'),
+      roe: g('financialData', 'returnOnEquity'),
+      roa: g('financialData', 'returnOnAssets'),
+      debtToEquity: y?.financialData?.debtToEquity?.raw != null
+        ? y.financialData.debtToEquity.raw / 100 // Normalized
+        : null,
+      freeCashFlow: g('financialData', 'freeCashflow'),
+      operatingCashFlow: g('financialData', 'operatingCashflow'),
+      grossMargins: g('financialData', 'grossMargins'),
+      operatingMargins: g('financialData', 'operatingMargins'),
+      profitMargins: g('financialData', 'profitMargins'),
+      revenue: g('financialData', 'totalRevenue'),
+      currentRatio: g('financialData', 'currentRatio'),
+      quickRatio: g('financialData', 'quickRatio'),
+      priceToBook: g('defaultKeyStatistics', 'priceToBook'),
+      beta: g('summaryDetail', 'beta'),
+      dividendYield: g('summaryDetail', 'dividendYield'),
+      promoterHolding: g('defaultKeyStatistics', 'heldPercentInsiders'),
+      institutionalHolding: g('defaultKeyStatistics', 'heldPercentInstitutions'),
+      pegRatio: g('defaultKeyStatistics', 'pegRatio'),
+    };
+  }
+
+  // Case 2: FMP Data (Professional Source)
   const q = summary.price || {};
   const p = summary.profile || {};
   const r = summary.ratios || {};
-  const g = summary.growth || {};
+  const gr = summary.growth || {};
 
   return {
     marketCap: q.marketCap || p.mktCap || null,
     pe: r.priceEarningsRatioTTM || null,
-    forwardPE: null, 
+    forwardPE: null,
     eps: r.netIncomePerShareTTM || null,
-    revenueGrowth: g.revenueGrowth || null,
-    earningsGrowth: g.epsgrowth || null,
+    revenueGrowth: gr.revenueGrowth || null,
+    earningsGrowth: gr.epsgrowth || null,
     roe: r.returnOnEquityTTM || null,
     roa: r.returnOnAssetsTTM || null,
     debtToEquity: r.debtToEquityTTM || null,

@@ -180,7 +180,7 @@ function renderSwingStrategy(data) {
   const macdBull = (() => {
     const ml = indicators.macd.macdLine.filter(Boolean);
     const sl = indicators.macd.signalLine.filter(Boolean);
-    return ml[ml.length-1] > sl[sl.length-1];
+    return ml[ml.length - 1] > sl[sl.length - 1];
   })();
 
   const { support, resistance } = indicators;

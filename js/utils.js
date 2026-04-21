@@ -187,7 +187,7 @@ function detectCross(ema50, ema200) {
   for (let i = n - 1; i >= 0 && valid.length < 2; i--) {
     if (ema50[i] !== null && ema200[i] !== null) valid.push(i);
   }
-  if (valid.length < 2) return ema50[n-1] > ema200[n-1] ? 'above' : 'below';
+  if (valid.length < 2) return ema50[n - 1] > ema200[n - 1] ? 'above' : 'below';
 
   const [curr, prev] = valid;
   const prev50 = ema50[prev], prev200 = ema200[prev];

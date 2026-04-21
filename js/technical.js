@@ -104,7 +104,7 @@ function buildSeriesData(ohlcv, values) {
 
 // ─── Destroy existing charts ───
 function destroyCharts() {
-  Object.values(charts).forEach(c => { try { c.remove(); } catch(e) {} });
+  Object.values(charts).forEach(c => { try { c.remove(); } catch (e) { } });
   charts = {};
 }
 
@@ -298,7 +298,7 @@ function syncChartTimeScales() {
       if (!param.time) return;
       allCharts.forEach(other => {
         if (other !== c) {
-          try { other.setCrosshairPosition(0, param.time, other.chartElement()); } catch(e) {}
+          try { other.setCrosshairPosition(0, param.time, other.chartElement()); } catch (e) { }
         }
       });
     });
@@ -306,7 +306,7 @@ function syncChartTimeScales() {
       if (!range) return;
       allCharts.forEach(other => {
         if (other !== c) {
-          try { other.timeScale().setVisibleLogicalRange(range); } catch(e) {}
+          try { other.timeScale().setVisibleLogicalRange(range); } catch (e) { }
         }
       });
     });
@@ -481,6 +481,6 @@ window.addEventListener('resize', () => {
       if (el && el.parentElement) {
         chart.applyOptions({ width: el.parentElement.clientWidth });
       }
-    } catch(e) {}
+    } catch (e) { }
   });
 });

@@ -43,14 +43,6 @@ document.addEventListener('DOMContentLoaded', () => {
     <div style="margin-top:4px;color:#f00;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px;">Err: <span id="debug-last-error">None</span></div>
   `;
   document.body.appendChild(debugOverlay);
-  
-  // Simulation Warning Banner
-  const simBanner = document.createElement('div');
-  simBanner.id = 'simulation-banner';
-  simBanner.className = 'hidden';
-  simBanner.style = 'position:fixed;top:70px;left:50%;transform:translateX(-50%);z-index:999;padding:6px 20px;background:rgba(255,165,0,0.9);color:#000;font-weight:bold;font-size:12px;border-radius:20px;box-shadow:0 4px 15px rgba(0,0,0,0.3);display:flex;align-items:center;gap:8px;transition:all 0.3s ease;';
-  simBanner.innerHTML = '⚠️ AUTONOMOUS SIMULATION MODE (External APIs Restricted)';
-  document.body.appendChild(simBanner);
 });
 /* ═══════════════════════════════════════════════
    app.js — Main Application Orchestrator
@@ -154,20 +146,21 @@ function initSearch() {
   input.addEventListener('input', async () => {
     clearTimeout(debounceTimer);
     debounceTimer = setTimeout(async () => {
-      await loadStockUniverse();
-      const q = input.value.trim().toUpperCase();
+      const q = input.value.trim();
       if (q.length < 1) { suggestions.classList.add('hidden'); return; }
-      const matches = STOCK_UNIVERSE.filter(t => t.startsWith(q)).slice(0, 10).map(t => t.replace('.NS', ''));
-      if (matches.length === 0) { suggestions.classList.add('hidden'); return; }
-      suggestions.innerHTML = matches.map(t => `
+      
+      const matches = await searchNSE(q);
+      if (!matches || matches.length === 0) { suggestions.classList.add('hidden'); return; }
+      
+      suggestions.innerHTML = matches.slice(0, 10).map(r => `
         <div class="suggestion-item" style="padding:10px 14px;cursor:pointer;font-size:13px;font-weight:600;border-bottom:1px solid var(--border);font-family:var(--font-mono);transition:background 0.15s"
           onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'"
-          onclick="selectTicker('${t}')">
-          ${t}<span style="font-size:11px;color:var(--text-muted);font-weight:400;margin-left:8px">NSE</span>
+          onclick="selectTicker('${r.symbol}')">
+          ${r.symbol}<span style="font-size:11px;color:var(--text-muted);font-weight:400;margin-left:8px;text-overflow:ellipsis;white-space:nowrap;overflow:hidden;max-width:200px;display:inline-block;vertical-align:bottom;">${r.company_name}</span>
         </div>
       `).join('');
       suggestions.classList.remove('hidden');
-    }, 200);
+    }, 250);
   });
 
   // Enter key
@@ -305,14 +298,6 @@ async function analyzeStock() {
     console.log("DEBUG: loadAllData returned successful data for:", data.symbol);
     document.getElementById('debug-source').textContent = window._activeSource || 'FMP';
     document.getElementById('debug-state').textContent = 'DATA_READY';
-    
-    // Toggle simulation banner
-    const simBanner = document.getElementById('simulation-banner');
-    if (window._activeSource && window._activeSource.includes('Simulation')) {
-      simBanner.classList.remove('hidden');
-    } else {
-      simBanner.classList.add('hidden');
-    }
     
     AppState.data = data;
     AppState.symbol = data.symbol;
