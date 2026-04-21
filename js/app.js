@@ -37,11 +37,20 @@ document.addEventListener('DOMContentLoaded', () => {
   debugOverlay.innerHTML = `
     <div style="font-weight:700;margin-bottom:4px;border-bottom:1px solid #0f0">🔍 AGENT DIAGNOSTICS</div>
     <div>Ticker: <span id="debug-ticker">None</span></div>
+    <div>Source: <span id="debug-source" style="color:#ff0">UNKNOWN</span></div>
     <div>Loading: <span id="debug-loading">false</span></div>
     <div>App State: <span id="debug-state">IDLE</span></div>
     <div style="margin-top:4px;color:#f00;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px;">Err: <span id="debug-last-error">None</span></div>
   `;
   document.body.appendChild(debugOverlay);
+  
+  // Simulation Warning Banner
+  const simBanner = document.createElement('div');
+  simBanner.id = 'simulation-banner';
+  simBanner.className = 'hidden';
+  simBanner.style = 'position:fixed;top:70px;left:50%;transform:translateX(-50%);z-index:999;padding:6px 20px;background:rgba(255,165,0,0.9);color:#000;font-weight:bold;font-size:12px;border-radius:20px;box-shadow:0 4px 15px rgba(0,0,0,0.3);display:flex;align-items:center;gap:8px;transition:all 0.3s ease;';
+  simBanner.innerHTML = '⚠️ AUTONOMOUS SIMULATION MODE (External APIs Restricted)';
+  document.body.appendChild(simBanner);
 });
 /* ═══════════════════════════════════════════════
    app.js — Main Application Orchestrator
@@ -294,7 +303,16 @@ async function analyzeStock() {
     const data = await loadAllData(ticker, onStep);
     
     console.log("DEBUG: loadAllData returned successful data for:", data.symbol);
+    document.getElementById('debug-source').textContent = window._activeSource || 'FMP';
     document.getElementById('debug-state').textContent = 'DATA_READY';
+    
+    // Toggle simulation banner
+    const simBanner = document.getElementById('simulation-banner');
+    if (window._activeSource && window._activeSource.includes('Simulation')) {
+      simBanner.classList.remove('hidden');
+    } else {
+      simBanner.classList.add('hidden');
+    }
     
     AppState.data = data;
     AppState.symbol = data.symbol;
