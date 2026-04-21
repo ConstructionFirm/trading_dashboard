@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StockPulse AI — Professional Indian Stock Analysis Dashboard</title>
+  <meta name="description" content="AI-powered stock analysis dashboard for NSE/BSE stocks with technical analysis, fundamentals, backtesting, and smart trade signals." />
+  <meta name="keywords" content="stock analysis, NSE, BSE, Indian stocks, technical analysis, fundamental analysis, trading dashboard" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+  <!-- ═══════════════════ HEADER ═══════════════════ -->
+  <header class="app-header" id="app-header">
+    <div class="header-brand">
+      <div class="brand-icon">
+        <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+          <path d="M4 24L10 14L16 18L22 8L28 12" stroke="url(#grad1)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <defs>
+            <linearGradient id="grad1" x1="4" y1="24" x2="28" y2="8" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#10b981"/>
+              <stop offset="1" stop-color="#3b82f6"/>
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
+      <div class="brand-text">
+        <span class="brand-name">StockPulse</span>
+        <span class="brand-suffix">AI</span>
+      </div>
+    </div>
+
+    <div class="search-container">
+      <div class="search-wrapper" id="search-wrapper">
+        <div class="search-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+          </svg>
+        </div>
+        <input
+          type="text"
+          id="ticker-input"
+          class="search-input"
+          placeholder="Enter NSE ticker (RELIANCE, TCS, INFY...)"
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <button class="analyze-btn" id="analyze-btn">
+          <span class="btn-text">Analyze</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <path d="m5 12h14m-7-7 7 7-7 7"/>
+          </svg>
+        </button>
+      </div>
+      <div class="search-suggestions hidden" id="search-suggestions"></div>
+    </div>
+
+    <div class="header-controls">
+      <div class="strategy-toggle" id="strategy-toggle-wrapper">
+        <button class="strategy-btn active" id="btn-swing" data-mode="swing">📊 Swing</button>
+        <button class="strategy-btn" id="btn-intraday" data-mode="intraday">⚡ Intraday</button>
+      </div>
+      <button class="theme-toggle" id="theme-toggle" title="Toggle theme">
+        <svg class="moon-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+        </svg>
+        <svg class="sun-icon hidden" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+          <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- ═══════════════════ LOADING OVERLAY ═══════════════════ -->
+  <div id="loading-overlay" class="loading-overlay hidden">
+    <div class="loading-content">
+      <div class="loading-spinner"></div>
+      <p class="loading-title">Fetching Market Data</p>
+      <p class="loading-subtitle" id="loading-status">Connecting to Yahoo Finance...</p>
+      <div class="loading-steps">
+        <div class="loading-step" id="step-price">Fetching price data...</div>
+        <div class="loading-step" id="step-fundamentals">Loading fundamentals...</div>
+        <div class="loading-step" id="step-indicators">Calculating indicators...</div>
+        <div class="loading-step" id="step-news">Fetching news sentiment...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════ EMPTY STATE ═══════════════════ -->
+  <div id="empty-state" class="empty-state">
+    <div class="empty-hero">
+      <div class="empty-icon">
+        <svg width="80" height="80" viewBox="0 0 80 80" fill="none">
+          <rect width="80" height="80" rx="20" fill="url(#bg-grad)"/>
+          <path d="M16 60L28 40L40 48L54 28L64 36" stroke="white" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="28" cy="40" r="3" fill="#10b981"/>
+          <circle cx="40" cy="48" r="3" fill="#f59e0b"/>
+          <circle cx="54" cy="28" r="3" fill="#3b82f6"/>
+          <defs>
+            <linearGradient id="bg-grad" x1="0" y1="0" x2="80" y2="80">
+              <stop stop-color="#1a2235"/>
+              <stop offset="1" stop-color="#0a0e1a"/>
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
+      <h2 class="empty-title">Professional Stock Intelligence</h2>
+      <p class="empty-subtitle">Enter any NSE/BSE ticker to get AI-powered fundamental & technical analysis, backtesting, and institutional-grade trade signals.</p>
+      <div class="popular-tickers">
+        <span class="popular-label">Popular:</span>
+        <button class="quick-ticker" data-ticker="RELIANCE">RELIANCE</button>
+        <button class="quick-ticker" data-ticker="TCS">TCS</button>
+        <button class="quick-ticker" data-ticker="INFY">INFY</button>
+        <button class="quick-ticker" data-ticker="HDFCBANK">HDFCBANK</button>
+        <button class="quick-ticker" data-ticker="TATAMOTORS">TATAMOTORS</button>
+        <button class="quick-ticker" data-ticker="WIPRO">WIPRO</button>
+      </div>
+    </div>
+    <div class="feature-grid">
+      <div class="feature-card">
+        <div class="feature-icon">📊</div>
+        <h3>Fundamental Analysis</h3>
+        <p>P/E, ROE, FCF, Revenue Growth, Promoter Holding & automatic red flag detection</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📈</div>
+        <h3>Technical Charts</h3>
+        <p>Candlestick + RSI, MACD, EMA crossovers, Golden/Death Cross detection</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🤖</div>
+        <h3>AI Score (0–100)</h3>
+        <p>Comprehensive scoring across fundamentals, technicals, and market sentiment</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">⚙️</div>
+        <h3>Strategy Backtester</h3>
+        <p>Simulate EMA + RSI strategy on 1Y historical data with equity curve</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════ MAIN DASHBOARD ═══════════════════ -->
+  <main id="dashboard" class="dashboard hidden">
+
+    <!-- ─── SUMMARY CARD ─── -->
+    <section class="summary-card" id="summary-card">
+      <div class="summary-top">
+        <div class="stock-identity">
+          <div class="stock-name-row">
+            <h1 id="stock-full-name" class="stock-full-name">--</h1>
+            <span id="stock-ticker-badge" class="ticker-badge">--</span>
+          </div>
+          <div class="stock-meta-row">
+            <span id="stock-sector-tag" class="sector-tag">--</span>
+            <span id="stock-exchange-tag" class="exchange-tag">NSE</span>
+            <span id="market-cap-summary" class="market-cap-tag">MCap: --</span>
+          </div>
+          <div class="delay-notice">⏱ Prices ~15min delayed · refreshes every 60s</div>
+        </div>
+
+        <div class="price-block">
+          <div id="live-price" class="live-price">--</div>
+          <div class="price-changes">
+            <div id="price-change-day" class="change-chip day-change">Day: --</div>
+            <div id="price-change-week" class="change-chip week-change">Week: --</div>
+          </div>
+          <div class="refresh-row">
+            <div class="refresh-dot" id="refresh-dot"></div>
+            <span>Next refresh: <span id="refresh-countdown">60</span>s</span>
+          </div>
+        </div>
+
+        <div class="verdict-block">
+          <div class="score-ring-wrapper">
+            <svg class="score-ring" viewBox="0 0 120 120" id="score-ring-svg">
+              <circle class="ring-bg" cx="60" cy="60" r="50" />
+              <circle class="ring-fill" cx="60" cy="60" r="50" id="ring-fill-circle" stroke-dasharray="0 314" />
+            </svg>
+            <div class="ring-center">
+              <div id="total-score-num" class="ring-score">--</div>
+              <div class="ring-label">/100</div>
+            </div>
+          </div>
+          <div class="verdict-meta">
+            <div id="verdict-badge" class="verdict-badge">ANALYZING...</div>
+            <div class="score-breakdown-mini">
+              <div class="mini-score-item">
+                <span class="mini-label">Fund</span>
+                <div class="mini-bar-track">
+                  <div class="mini-bar fund-bar" id="mini-fund-bar" style="width:0%"></div>
+                </div>
+                <span class="mini-val" id="mini-fund-val">--/40</span>
+              </div>
+              <div class="mini-score-item">
+                <span class="mini-label">Tech</span>
+                <div class="mini-bar-track">
+                  <div class="mini-bar tech-bar" id="mini-tech-bar" style="width:0%"></div>
+                </div>
+                <span class="mini-val" id="mini-tech-val">--/40</span>
+              </div>
+              <div class="mini-score-item">
+                <span class="mini-label">Sent</span>
+                <div class="mini-bar-track">
+                  <div class="mini-bar sent-bar" id="mini-sent-bar" style="width:0%"></div>
+                </div>
+                <span class="mini-val" id="mini-sent-val">--/20</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="smart-insight-bar" id="smart-insight-bar">
+        <div class="insight-label">
+          <span class="ai-badge">🧠 Smart Insight</span>
+          <span class="pro-label">What a Professional Trader Would Do</span>
+        </div>
+        <p id="smart-insight-text" class="insight-text">Search a stock to receive AI-powered professional analysis...</p>
+      </div>
+    </section>
+
+    <!-- ─── MODULE TABS ─── -->
+    <nav class="module-tabs" id="module-tabs">
+      <button class="tab-btn active" data-tab="fundamentals" id="tab-btn-fundamentals">
+        <span class="tab-icon">📊</span><span class="tab-label">Fundamentals</span>
+      </button>
+      <button class="tab-btn" data-tab="technical" id="tab-btn-technical">
+        <span class="tab-icon">📈</span><span class="tab-label">Technical</span>
+      </button>
+      <button class="tab-btn" data-tab="prediction" id="tab-btn-prediction">
+        <span class="tab-icon">🎯</span><span class="tab-label">Prediction</span>
+      </button>
+      <button class="tab-btn" data-tab="news" id="tab-btn-news">
+        <span class="tab-icon">📰</span><span class="tab-label">Market Drivers</span>
+      </button>
+      <button class="tab-btn" data-tab="scoring" id="tab-btn-scoring">
+        <span class="tab-icon">🤖</span><span class="tab-label">AI Score</span>
+      </button>
+      <button class="tab-btn" data-tab="backtest" id="tab-btn-backtest">
+        <span class="tab-icon">⚙️</span><span class="tab-label">Backtest</span>
+      </button>
+      <button class="tab-btn" data-tab="strategy" id="tab-btn-strategy">
+        <span class="tab-icon">🎮</span><span class="tab-label">Strategy</span>
+      </button>
+    </nav>
+
+    <!-- ═══ MODULE 1: FUNDAMENTALS ═══ -->
+    <section class="tab-content active" id="tab-fundamentals">
+      <div class="module-header">
+        <h2 class="module-title">📊 Fundamental Analysis</h2>
+        <div id="fundamental-classification" class="classification-badge">--</div>
+      </div>
+
+      <div class="metrics-grid" id="fundamental-metrics-grid">
+        <!-- filled by fundamentals.js -->
+      </div>
+
+      <div class="red-flags-section" id="red-flags-section">
+        <h3 class="section-subhead">⚠️ Red Flags Detected</h3>
+        <div id="red-flags-list" class="red-flags-list"></div>
+      </div>
+
+      <div class="green-flags-section" id="green-flags-section">
+        <h3 class="section-subhead">✅ Strengths Identified</h3>
+        <div id="green-flags-list" class="green-flags-list"></div>
+      </div>
+    </section>
+
+    <!-- ═══ MODULE 2: TECHNICAL ═══ -->
+    <section class="tab-content hidden" id="tab-technical">
+      <div class="module-header">
+        <h2 class="module-title">📈 Technical Analysis</h2>
+        <div class="trend-badge-row">
+          <div id="trend-direction-badge" class="trend-badge">--</div>
+          <div id="cross-signal-badge" class="cross-badge">--</div>
+          <div id="breakout-badge" class="breakout-badge hidden">--</div>
+        </div>
+      </div>
+
+      <div class="timeframe-selector">
+        <button class="tf-btn active" data-tf="1d" id="tf-1d">1 Day</button>
+        <button class="tf-btn" data-tf="1wk" id="tf-1wk">1 Week</button>
+        <button class="tf-btn" data-tf="1mo" id="tf-1mo">1 Month</button>
+      </div>
+
+      <div class="chart-stack">
+        <div class="chart-panel main-chart-panel">
+          <div class="chart-panel-header">
+            <span class="chart-panel-title">Price + EMA</span>
+            <div class="chart-legend">
+              <span class="legend-dot ema50-dot"></span><span>50 EMA</span>
+              <span class="legend-dot ema200-dot"></span><span>200 EMA</span>
+            </div>
+          </div>
+          <div id="main-chart-container" class="chart-container" style="height:360px;"></div>
+        </div>
+        <div class="chart-panel volume-chart-panel">
+          <div class="chart-panel-header"><span class="chart-panel-title">Volume</span></div>
+          <div id="volume-chart-container" class="chart-container" style="height:120px;"></div>
+        </div>
+        <div class="chart-panel rsi-chart-panel">
+          <div class="chart-panel-header">
+            <span class="chart-panel-title">RSI (14)</span>
+            <div id="rsi-current-value" class="indicator-current-val">--</div>
+            <div id="rsi-zone" class="rsi-zone-badge">--</div>
+          </div>
+          <div id="rsi-chart-container" class="chart-container" style="height:140px;"></div>
+        </div>
+        <div class="chart-panel macd-chart-panel">
+          <div class="chart-panel-header">
+            <span class="chart-panel-title">MACD (12/26/9)</span>
+            <div id="macd-signal-badge" class="macd-signal">--</div>
+          </div>
+          <div id="macd-chart-container" class="chart-container" style="height:140px;"></div>
+        </div>
+      </div>
+
+      <div class="technical-summary-grid" id="technical-summary-grid">
+        <!-- filled by technical.js -->
+      </div>
+    </section>
+
+    <!-- ═══ MODULE 3: PREDICTION ═══ -->
+    <section class="tab-content hidden" id="tab-prediction">
+      <div class="module-header">
+        <h2 class="module-title">🎯 Price Prediction</h2>
+        <div id="prediction-confidence" class="confidence-badge">--</div>
+      </div>
+
+      <div class="prediction-grid">
+        <div class="prediction-main-card" id="prediction-main-card">
+          <div class="pred-direction" id="pred-direction-display">--</div>
+          <div class="pred-label">Next Likely Move</div>
+          <div class="pred-confidence-row">
+            <span>Confidence:</span>
+            <div id="pred-confidence-bar-wrapper" class="confidence-bar-wrapper">
+              <div class="confidence-bar" id="pred-confidence-bar" style="width:0%"></div>
+            </div>
+            <span id="pred-confidence-text">--</span>
+          </div>
+        </div>
+
+        <div class="price-range-card">
+          <h3 class="card-title">Expected Price Range (Short-Term)</h3>
+          <div class="range-visual" id="range-visual">
+            <div class="range-row">
+              <span class="range-label bearish-text">Bear Target</span>
+              <span id="bear-target" class="range-val">--</span>
+            </div>
+            <div class="current-price-marker">
+              <span>Current: </span><span id="pred-current-price" class="current-price-val">--</span>
+            </div>
+            <div class="range-row">
+              <span class="range-label bullish-text">Bull Target</span>
+              <span id="bull-target" class="range-val">--</span>
+            </div>
+          </div>
+          <div class="atr-note" id="atr-note">ATR(14): --</div>
+        </div>
+      </div>
+
+      <div class="prediction-drivers" id="prediction-drivers">
+        <h3 class="section-subhead">📌 Signal Breakdown</h3>
+        <div class="driver-grid" id="driver-grid">
+          <!-- filled by prediction.js -->
+        </div>
+      </div>
+
+      <div class="sr-zones-card" id="sr-zones-card">
+        <h3 class="section-subhead">🎯 Support & Resistance Zones</h3>
+        <div class="sr-row">
+          <div class="sr-zone resistance">
+            <span class="sr-label">Resistance</span>
+            <span id="resistance-level" class="sr-value">--</span>
+          </div>
+          <div class="sr-zone support">
+            <span class="sr-label">Support</span>
+            <span id="support-level" class="sr-value">--</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ MODULE 4: NEWS & DRIVERS ═══ -->
+    <section class="tab-content hidden" id="tab-news">
+      <div class="module-header">
+        <h2 class="module-title">📰 Market Drivers & News</h2>
+        <div id="primary-driver-badge" class="driver-badge">--</div>
+      </div>
+
+      <div class="driver-analysis-card" id="driver-analysis-card">
+        <div class="driver-type-grid">
+          <div class="driver-type-item" id="driver-company">
+            <div class="driver-icon">🏢</div>
+            <div class="driver-type-label">Company-Specific</div>
+            <div id="driver-company-val" class="driver-strength">--</div>
+          </div>
+          <div class="driver-type-item" id="driver-sector">
+            <div class="driver-icon">🏭</div>
+            <div class="driver-type-label">Sector Trend</div>
+            <div id="driver-sector-val" class="driver-strength">--</div>
+          </div>
+          <div class="driver-type-item" id="driver-market">
+            <div class="driver-icon">📊</div>
+            <div class="driver-type-label">Market (Nifty)</div>
+            <div id="driver-market-val" class="driver-strength">--</div>
+          </div>
+        </div>
+        <div class="primary-driver-explanation" id="primary-driver-text">
+          Analyzing market drivers...
+        </div>
+      </div>
+
+      <div class="nifty-correlation-card" id="nifty-correlation-card">
+        <h3 class="card-title">Nifty 50 Correlation</h3>
+        <div class="nifty-data-row">
+          <div class="nifty-item">
+            <span class="nifty-label">Nifty 50</span>
+            <span id="nifty-price" class="nifty-price">--</span>
+            <span id="nifty-change" class="nifty-change">--</span>
+          </div>
+          <div class="correlation-arrow" id="correlation-arrow">→</div>
+          <div class="nifty-item">
+            <span class="nifty-label">Stock</span>
+            <span id="corr-stock-change" class="nifty-price">--</span>
+          </div>
+        </div>
+        <div id="correlation-insight" class="correlation-insight">--</div>
+      </div>
+
+      <div class="news-section">
+        <h3 class="section-subhead">📰 Latest News Headlines</h3>
+        <div id="news-list" class="news-list">
+          <div class="news-loading">Loading news from newsdata.io...</div>
+        </div>
+      </div>
+
+      <div class="sentiment-summary-card" id="sentiment-summary-card">
+        <h3 class="card-title">News Sentiment Summary</h3>
+        <div class="sentiment-bars">
+          <div class="sent-bar-row">
+            <span class="sent-bar-label bullish-text">Positive</span>
+            <div class="sent-bar-track"><div class="sent-bar-fill positive-fill" id="pos-sent-bar" style="width:0%"></div></div>
+            <span id="pos-sent-count" class="sent-count">0</span>
+          </div>
+          <div class="sent-bar-row">
+            <span class="sent-bar-label neutral-text">Neutral</span>
+            <div class="sent-bar-track"><div class="sent-bar-fill neutral-fill" id="neu-sent-bar" style="width:0%"></div></div>
+            <span id="neu-sent-count" class="sent-count">0</span>
+          </div>
+          <div class="sent-bar-row">
+            <span class="sent-bar-label bearish-text">Negative</span>
+            <div class="sent-bar-track"><div class="sent-bar-fill negative-fill" id="neg-sent-bar" style="width:0%"></div></div>
+            <span id="neg-sent-count" class="sent-count">0</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ MODULE 5: AI SCORING ═══ -->
+    <section class="tab-content hidden" id="tab-scoring">
+      <div class="module-header">
+        <h2 class="module-title">🤖 AI Stock Scoring Model</h2>
+        <div id="ai-score-badge" class="ai-score-badge">--</div>
+      </div>
+
+      <div class="score-full-display">
+        <div class="score-gauge-large">
+          <svg class="gauge-svg" viewBox="0 0 200 200" id="gauge-svg-large">
+            <circle class="gauge-bg" cx="100" cy="100" r="80" />
+            <circle class="gauge-fill" cx="100" cy="100" r="80" id="gauge-fill-large"
+              stroke-dasharray="0 502"
+              stroke-dashoffset="125"
+            />
+          </svg>
+          <div class="gauge-center">
+            <div id="gauge-score-num" class="gauge-score-num">--</div>
+            <div class="gauge-score-label">AI Score</div>
+            <div id="gauge-classification" class="gauge-classification">--</div>
+          </div>
+        </div>
+
+        <div class="score-pillar-breakdown">
+          <div class="pillar-card">
+            <div class="pillar-header">
+              <span class="pillar-icon">📊</span>
+              <span class="pillar-name">Fundamental</span>
+              <span id="fund-score-num" class="pillar-score">--/40</span>
+            </div>
+            <div class="pillar-bar-track">
+              <div class="pillar-bar fund-pillar" id="fund-pillar-bar" style="width:0%"></div>
+            </div>
+            <div id="fund-score-items" class="score-items-list"></div>
+          </div>
+          <div class="pillar-card">
+            <div class="pillar-header">
+              <span class="pillar-icon">📈</span>
+              <span class="pillar-name">Technical</span>
+              <span id="tech-score-num" class="pillar-score">--/40</span>
+            </div>
+            <div class="pillar-bar-track">
+              <div class="pillar-bar tech-pillar" id="tech-pillar-bar" style="width:0%"></div>
+            </div>
+            <div id="tech-score-items" class="score-items-list"></div>
+          </div>
+          <div class="pillar-card">
+            <div class="pillar-header">
+              <span class="pillar-icon">📰</span>
+              <span class="pillar-name">Sentiment</span>
+              <span id="sent-score-num" class="pillar-score">--/20</span>
+            </div>
+            <div class="pillar-bar-track">
+              <div class="pillar-bar sent-pillar" id="sent-pillar-bar" style="width:0%"></div>
+            </div>
+            <div id="sent-score-items" class="score-items-list"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="deductions-card">
+        <h3 class="section-subhead">📉 Score Deductions — Reasons</h3>
+        <div id="deductions-list" class="deductions-list"></div>
+      </div>
+
+      <div class="classification-scale">
+        <h3 class="section-subhead">📏 Score Classification Scale</h3>
+        <div class="scale-grid">
+          <div class="scale-item strong-buy"><span class="scale-range">80–100</span><span class="scale-label">Strong Buy Zone</span></div>
+          <div class="scale-item buy-dip"><span class="scale-range">60–79</span><span class="scale-label">Buy on Dip</span></div>
+          <div class="scale-item neutral"><span class="scale-range">40–59</span><span class="scale-label">Neutral / Watchlist</span></div>
+          <div class="scale-item risky"><span class="scale-range">20–39</span><span class="scale-label">Risky</span></div>
+          <div class="scale-item avoid"><span class="scale-range">0–19</span><span class="scale-label">Avoid</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ MODULE 6: BACKTEST ═══ -->
+    <section class="tab-content hidden" id="tab-backtest">
+      <div class="module-header">
+        <h2 class="module-title">⚙️ Strategy Backtesting</h2>
+        <div id="backtest-verdict" class="backtest-verdict-badge">--</div>
+      </div>
+
+      <div class="strategy-rule-card">
+        <h3 class="card-title">Strategy Rules (EMA + RSI Momentum)</h3>
+        <div class="rule-grid">
+          <div class="rule-item buy-rule">
+            <div class="rule-label bullish-text">📈 BUY Signal</div>
+            <div class="rule-conditions">
+              <div>Price &gt; 50 EMA &amp; 200 EMA</div>
+              <div>RSI between 50–65</div>
+              <div>Volume &gt; average</div>
+            </div>
+          </div>
+          <div class="rule-item sell-rule">
+            <div class="rule-label bearish-text">📉 SELL Signal</div>
+            <div class="rule-conditions">
+              <div>RSI &gt; 70 (overbought)</div>
+              <div>OR Price drops below 50 EMA</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="backtest-meta-row">
+        <label class="meta-label">Period:</label>
+        <div class="period-toggle">
+          <button class="period-btn active" id="period-6m" data-period="6mo">6 Months</button>
+          <button class="period-btn" id="period-1y" data-period="1y">1 Year</button>
+        </div>
+        <button class="run-backtest-btn" id="run-backtest-btn">▶ Run Backtest</button>
+      </div>
+
+      <div class="backtest-results" id="backtest-results">
+        <div class="metrics-row" id="backtest-metrics-row">
+          <!-- filled by backtest.js -->
+        </div>
+        <div class="equity-curve-panel">
+          <div class="chart-panel-header"><span class="chart-panel-title">📈 Equity Curve (Capital Growth)</span></div>
+          <div id="equity-curve-container" class="chart-container" style="height:280px;"></div>
+        </div>
+        <div class="trade-log-panel">
+          <h3 class="section-subhead">📋 Trade Log</h3>
+          <div id="trade-log-table" class="trade-log-table"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ MODULE 7: STRATEGY ═══ -->
+    <section class="tab-content hidden" id="tab-strategy">
+      <div class="module-header">
+        <h2 class="module-title">🎮 Strategy Mode</h2>
+        <div id="recommended-mode-badge" class="recommended-badge">--</div>
+      </div>
+
+      <div class="strategy-mode-tabs">
+        <button class="smode-btn" id="smode-swing" data-smode="swing">📊 Swing Trading</button>
+        <button class="smode-btn" id="smode-intraday" data-smode="intraday">⚡ Intraday</button>
+      </div>
+
+      <div class="strategy-output-grid" id="strategy-output-grid">
+        <!-- filled by strategy.js -->
+      </div>
+
+      <div class="volatility-card" id="volatility-card">
+        <h3 class="card-title">Volatility Assessment</h3>
+        <div class="volatility-metrics" id="volatility-metrics">
+          <!-- filled by strategy.js -->
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="app-footer">
+    <p>StockPulse AI · For educational purposes only. Not financial advice. Data from Yahoo Finance (15 min delayed).</p>
+  </footer>
+
+  <!-- ─── SCRIPTS ─── -->
+  <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/fundamentals.js"></script>
+  <script src="js/technical.js"></script>
+  <script src="js/prediction.js"></script>
+  <script src="js/news.js"></script>
+  <script src="js/scoring.js"></script>
+  <script src="js/backtest.js"></script>
+  <script src="js/strategy.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
