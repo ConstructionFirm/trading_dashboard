@@ -1,0 +1,65 @@
+{
+  "api_fmp_price": {
+    "name": "FMP Price API (historical-price-eod/full)",
+    "url": "https://financialmodelingprep.com/stable/historical-price-eod/full?symbol=RICHA.NS&apikey=HIDDEN_KEY",
+    "response": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/"
+  },
+  "api_yahoo_price": {
+    "name": "Yahoo Finance Price API",
+    "url": "https://query1.finance.yahoo.com/v8/finance/chart/RICHA.NS?interval=1d&range=1y",
+    "response": {
+      "chart": {
+        "result": null,
+        "error": {
+          "code": "Not Found",
+          "description": "No data found, symbol may be delisted"
+        }
+      }
+    }
+  },
+  "api_nse_ruby_fundamentals": {
+    "name": "NSE Ruby Direct Detail API",
+    "url": "https://nse-api-ruby.vercel.app/stock?symbol=RICHA",
+    "response": {
+      "error": "fetch failed"
+    }
+  },
+  "api_fmp_quote": {
+    "name": "FMP Quote API",
+    "url": "https://financialmodelingprep.com/stable/quote?symbol=RICHA.NS&apikey=HIDDEN_KEY",
+    "response": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/"
+  },
+  "api_fmp_profile": {
+    "name": "FMP Profile API",
+    "url": "https://financialmodelingprep.com/stable/profile?symbol=RICHA.NS&apikey=HIDDEN_KEY",
+    "response": []
+  },
+  "api_fmp_ratios": {
+    "name": "FMP Ratios API",
+    "url": "https://financialmodelingprep.com/stable/ratios-ttm?symbol=RICHA.NS&apikey=HIDDEN_KEY",
+    "response": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/"
+  },
+  "api_fmp_growth": {
+    "name": "FMP Financial Growth API",
+    "url": "https://financialmodelingprep.com/stable/financial-growth?symbol=RICHA.NS&limit=1&apikey=HIDDEN_KEY",
+    "response": "Premium Query Parameter: 'Special Endpoint : This value set for 'symbol' is not available under your current subscription please visit our subscription page to upgrade your plan at https://financialmodelingprep.com/"
+  },
+  "api_yahoo_summary": {
+    "name": "Yahoo Quote Summary (Fundamentals API)",
+    "url": "https://query1.finance.yahoo.com/v10/finance/quoteSummary/RICHA.NS?modules=defaultKeyStatistics,financialData,summaryDetail,summaryProfile,price",
+    "response": {
+      "finance": {
+        "result": null,
+        "error": {
+          "code": "Unauthorized",
+          "description": "Invalid Crumb"
+        }
+      }
+    }
+  },
+  "api_fmp_news": {
+    "name": "FMP News API (Sentiment Source)",
+    "url": "https://financialmodelingprep.com/stable/stock_news?tickers=RICHA.NS&limit=10&apikey=HIDDEN_KEY",
+    "response": []
+  }
+}

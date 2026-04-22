@@ -63,17 +63,7 @@ window.AppState = {
   refreshSecs: 60,
 };
 
-// ─── Stock Universe (dynamic, top 100 for initial suggestions) ───
-let STOCK_UNIVERSE = [];
-let TOP_TICKERS = [];
-let stockUniverseLoaded = false;
-
-async function loadStockUniverse() {
-  if (stockUniverseLoaded) return;
-  STOCK_UNIVERSE = await getStockUniverse();
-  TOP_TICKERS = STOCK_UNIVERSE.slice(0, 100).map(t => t.replace('.NS', ''));
-  stockUniverseLoaded = true;
-}
+const TOP_TICKERS = ["RELIANCE", "TCS", "HDFCBANK", "ICICIBANK", "INFY", "ITC", "SBIN", "BHARTIARTL", "LT", "BAJFINANCE"];
 
 // ────────────────────────────────────────────────
 // INIT
@@ -190,19 +180,16 @@ window.selectTicker = function (ticker) {
 };
 
 function initQuickTickers() {
-  // Show top 100 tickers as quick buttons
-  (async () => {
-    await loadStockUniverse();
-    const quickContainer = document.getElementById('quick-tickers');
-    if (!quickContainer) return;
-    quickContainer.innerHTML = TOP_TICKERS.map(t => `<button class="quick-ticker" data-ticker="${t}">${t}</button>`).join(' ');
-    quickContainer.querySelectorAll('.quick-ticker').forEach(btn => {
-      btn.addEventListener('click', () => {
-        document.getElementById('ticker-input').value = btn.dataset.ticker;
-        analyzeStock();
-      });
+  const quickContainer = document.getElementById('quick-tickers');
+  if (!quickContainer) return;
+  
+  quickContainer.innerHTML = TOP_TICKERS.map(t => `<button class="quick-ticker" data-ticker="${t}">${t}</button>`).join(' ');
+  quickContainer.querySelectorAll('.quick-ticker').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.getElementById('ticker-input').value = btn.dataset.ticker;
+      analyzeStock();
     });
-  })();
+  });
 }
 
 // ─── Tab Navigation ───
@@ -271,25 +258,6 @@ async function analyzeStock() {
       }
     };
 
-    // Load universe with error handling
-    console.log("DEBUG: Loading stock universe...");
-    setLoadingStatus('Verifying ticker in Indian universe...');
-    try {
-      await loadStockUniverse();
-    } catch (uErr) {
-      console.warn("DEBUG: Stock universe fetch failed, using fallback:", uErr.message);
-      // Fallback is handled within loadStockUniverse if it was properly written, 
-      // but let's ensure we proceed if it fails.
-    }
-    
-    const symbolNS = ticker + '.NS';
-    const symbolBSE = ticker + '.BSE';
-    const exists = STOCK_UNIVERSE && (STOCK_UNIVERSE.includes(symbolNS) || STOCK_UNIVERSE.includes(symbolBSE));
-
-    if (!exists) {
-      console.warn("DEBUG: Ticker not found in universe list:", ticker);
-      setLoadingStatus(`Ticker ${ticker} not in central list, trying direct fetch...`);
-    }
 
     console.log("DEBUG: Calling loadAllData...");
     document.getElementById('debug-state').textContent = 'FETCHING_DATA';

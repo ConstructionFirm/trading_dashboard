@@ -1,118 +1,3 @@
-// ─── Stock Universe Fetch, Parse, and Cache (NSE + BSE) ───
-const STOCK_LIST_CACHE_KEY = 'stock_universe_v1';
-const STOCK_LIST_CACHE_TTL = 24 * 60 * 60 * 1000; // 1 day
-
-// ─── Search API (NSE Ruby) ───
-async function searchNSE(query) {
-  try {
-    const url = `${API_CONFIG.NSE_RUBY_BASE}/search?q=${encodeURIComponent(query)}`;
-    const res = await fetch(url);
-    if (!res.ok) return [];
-    const data = await res.json();
-    return data && data.results ? data.results : [];
-  } catch (e) {
-    console.warn('NSE Search fail:', e.message);
-    return [];
-  }
-}
-
-// Fetch NSE equity list (preferred)
-async function fetchNSEStockUniverse() {
-  try {
-    const url = 'https://www.nseindia.com/api/equity-stockIndices?index=ALL';
-    const res = await fetchWithProxy(url, 30000);
-    if (!res || !res.data || !Array.isArray(res.data)) throw new Error('Invalid NSE ALL response');
-    return res.data;
-  } catch (e) {
-    console.warn('NSE ALL fetch failed:', e.message);
-    return null;
-  }
-}
-
-// Fallback: Fetch static CSV
-async function fetchNSEStockCSV() {
-  try {
-    const url = 'https://archives.nseindia.com/content/equities/EQUITY_L.csv';
-    const res = await fetchWithProxy(url, 30000);
-    if (typeof res !== 'string') throw new Error('CSV not string');
-    return res;
-  } catch (e) {
-    console.warn('NSE CSV fetch failed:', e.message);
-    return null;
-  }
-}
-
-// Parse NSE ALL API response
-function parseNSEStockUniverse(data) {
-  if (!Array.isArray(data)) return [];
-  return data
-    .filter(s => s.symbol && s.series === 'EQ')
-    .map(s => ({ symbol: s.symbol, name: s.meta && s.meta.companyName ? s.meta.companyName : s.symbol, series: s.series }));
-}
-
-// Parse CSV fallback
-function parseNSEStockCSV(csv) {
-  const lines = csv.split(/\r?\n/);
-  const header = lines[0].split(',');
-  const idxSymbol = header.indexOf('SYMBOL');
-  const idxName = header.indexOf('NAME OF COMPANY');
-  const idxSeries = header.indexOf('SERIES');
-  if (idxSymbol < 0 || idxName < 0 || idxSeries < 0) return [];
-  return lines.slice(1).map(row => {
-    const cols = row.split(',');
-    return {
-      symbol: cols[idxSymbol],
-      name: cols[idxName],
-      series: cols[idxSeries],
-    };
-  }).filter(s => s.symbol && s.series === 'EQ');
-}
-
-// Get stock universe (with cache and local fallback)
-async function getStockUniverse() {
-  const localFallback = ["RELIANCE.NS", "TCS.NS", "HDFCBANK.NS", "ICICIBANK.NS", "INFY.NS", "BHARTIARTL.NS", "ITC.NS", "SBIN.NS", "LICI.NS", "HINDUNILVR.NS", "TITAN.NS", "HINDZINC.NS", "HCLTECH.NS", "MARUTI.NS", "SUNPHARMA.NS", "BAJFINANCE.NS", "ADANIENT.NS", "TATAMOTORS.NS", "ONGC.NS", "JSWSTEEL.NS", "ADANIPORTS.NS", "ASIANPAINT.NS", "KOTAKBANK.NS", "COALINDIA.NS", "AXISBANK.NS", "ADANIPOWER.NS", "ULTRACEMCO.NS", "NTPC.NS", "BAJAJFINSV.NS", "M&M.NS", "SHREECEM.NS", "NESTLEIND.NS", "GRASIM.NS", "POWERGRID.NS", "INDUSINDBK.NS", "JSWENERGY.NS", "TATASTEEL.NS", "HINDALCO.NS", "ADANIGREEN.NS", "ADANITRANS.NS", "DMART.NS", "BAJAJ-AUTO.NS", "DLF.NS", "VBL.NS", "HAL.NS", "BEL.NS", "SIEMENS.NS", "IRFC.NS", "PFC.NS", "RECLTD.NS"];
-
-  try {
-    // Try cache first
-    const cached = localStorage.getItem(STOCK_LIST_CACHE_KEY);
-    if (cached) {
-      const parsed = JSON.parse(cached);
-      if (Date.now() - parsed.time < STOCK_LIST_CACHE_TTL) {
-        console.log("DEBUG: Using cached stock universe");
-        return parsed.data;
-      }
-    }
-
-    // Try NSE ALL API with strict timeout
-    let stocks = [];
-    console.log("DEBUG: Fetching NSE universe...");
-    const nseData = await fetchNSEStockUniverse(); // fetchWithProxy already has timeout
-
-    if (nseData) {
-      stocks = parseNSEStockUniverse(nseData);
-      console.log("DEBUG: NSE API universe success");
-    } else {
-      console.log("DEBUG: NSE API failed, trying CSV...");
-      const csv = await fetchNSEStockCSV();
-      if (csv) {
-        stocks = parseNSEStockCSV(csv);
-        console.log("DEBUG: NSE CSV universe success");
-      }
-    }
-
-    if (stocks.length > 0) {
-      const tickers = stocks.map(s => s.symbol + '.NS');
-      localStorage.setItem(STOCK_LIST_CACHE_KEY, JSON.stringify({ data: tickers, time: Date.now() }));
-      return tickers;
-    }
-  } catch (err) {
-    console.error("DEBUG: getStockUniverse failed:", err.message);
-  }
-
-  console.warn("DEBUG: Using local hardcoded fallback stock universe");
-  return localFallback;
-}
-
 // ─── Batch Processing Utilities ───
 function chunkArray(arr, size) {
   const out = [];
@@ -327,14 +212,35 @@ async function fetchQuoteSummary(symbol) {
   // Stage 0: Direct NSE API (For Indian Stocks)
   if (symbol.endsWith('.NS') || symbol.endsWith('.BO')) {
     try {
-      console.log(`DEBUG: Stage 0 - NSE Ruby Summary: ${symbol}`);
-      const url = `${API_CONFIG.NSE_RUBY_BASE}/stock?symbol=${symbol}`;
+      const lookupSymbol = symbol.replace('.NS', '').replace('.BO', '');
+      console.log(`DEBUG: Stage 0 - NSE Ruby Summary: ${lookupSymbol}`);
+      const url = `${API_CONFIG.NSE_RUBY_BASE}/stock?symbol=${lookupSymbol}`;
       const res = await fetch(url);
+      
+      const contentType = res.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+         throw new TypeError("Non-JSON response from NSE Ruby API");
+      }
+      
       const data = await res.json();
       if (data && data.status === 'success' && data.data) {
+         const d = data.data;
          return {
-           nse_ruby: data.data,
+           nse_ruby: d,
            symbol,
+           price: {
+             price: d.last_price?.value || 0,
+             change: d.change?.value || 0,
+             changesPercentage: d.percent_change?.value || 0,
+             name: d.company_name || symbol
+           },
+           profile: {
+             companyName: d.company_name || symbol,
+             sector: d.sector || 'India',
+             exchangeShortName: symbol.endsWith('.NS') ? 'NSE' : 'BSE'
+           },
+           ratios: {},
+           growth: {},
            _source: 'Direct NSE API'
          };
       }
